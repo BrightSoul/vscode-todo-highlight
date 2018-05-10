@@ -124,29 +124,29 @@ function activate(context) {
                 activeEditor.setDecorations(decorationType.inline, rangeOption);
             } else {
                 activeEditor.setDecorations(decorationType.block, rangeOption);
-                    /*for (var i = 0; i < rangeOption.length; i++) {
-                        var range = rangeOption[i].range;
-                        for (var l = range.start.line; l <= range.end.line; l++) {
-                            var style = decorationType.block;
-                            if (l == range.start.line) {
-                                var partialRange = new vscode.Range(new vscode.Position(l, range.start.character), new vscode.Position(l, l == range.end.line ? range.end.character : lines[l].length - 1));
-                                if (range.start.character == 0 && (l < range.end.line || lines[l].replace("\r", "").length <= range.end.character)) {
-                                    activeEditor.setDecorations(decorationType.block, [partialRange]);
-                                } else {
-                                    activeEditor.setDecorations(decorationType.inline, [partialRange]);
-                                }
-                            } else if (l == range.end.line) {
-                                var partialRange = new vscode.Range(new vscode.Position(l, 0), new vscode.Position(l, range.end.character));
-                                activeEditor.setDecorations(decorationType.inline, [partialRange]);
-
-                            } else {
-                                var partialRange = new vscode.Range(new vscode.Position(l, 0), new vscode.Position(l, 1));
+                /*for (var i = 0; i < rangeOption.length; i++) {
+                    var range = rangeOption[i].range;
+                    for (var l = range.start.line; l <= range.end.line; l++) {
+                        var style = decorationType.block;
+                        if (l == range.start.line) {
+                            var partialRange = new vscode.Range(new vscode.Position(l, range.start.character), new vscode.Position(l, l == range.end.line ? range.end.character : lines[l].length - 1));
+                            if (range.start.character == 0 && (l < range.end.line || lines[l].replace("\r", "").length <= range.end.character)) {
                                 activeEditor.setDecorations(decorationType.block, [partialRange]);
+                            } else {
+                                activeEditor.setDecorations(decorationType.inline, [partialRange]);
                             }
+                        } else if (l == range.end.line) {
+                            var partialRange = new vscode.Range(new vscode.Position(l, 0), new vscode.Position(l, range.end.character));
+                            activeEditor.setDecorations(decorationType.inline, [partialRange]);
 
+                        } else {
+                            var partialRange = new vscode.Range(new vscode.Position(l, 0), new vscode.Position(l, 1));
+                            activeEditor.setDecorations(decorationType.block, [partialRange]);
                         }
+
                     }
-                    */
+                }
+                */
             }
         })
     }
