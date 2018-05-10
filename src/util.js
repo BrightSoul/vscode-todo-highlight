@@ -8,18 +8,6 @@ var zapIcon = '$(zap)';
 var defaultMsg = '0';
 
 var DEFAULT_KEYWORDS = {
-    "TODO:": {
-        text: "TODO:",
-        color: '#fff',
-        backgroundColor: '#ffbd2a',
-        overviewRulerColor: 'rgba(255,189,42,0.8)'
-    },
-    "FIXME:": {
-        text: "FIXME:",
-        color: '#fff',
-        backgroundColor: '#f06292',
-        overviewRulerColor: 'rgba(240,98,146,0.8)'
-    }
 };
 
 var DEFAULT_STYLE = {
@@ -64,7 +52,7 @@ function getPathes(config) {
         : (typeof config == 'string' ? config : '');
 }
 
-function searchAnnotations(workspaceState, pattern, callback) {
+function searchAnnotations(workspaceState, patterns, callback) {
 
     var settings = workspace.getConfiguration('todohighlight');
     var includePattern = getPathes(settings.get('include')) || '{**/*}';
@@ -106,7 +94,7 @@ function searchAnnotations(workspaceState, pattern, callback) {
         for (var i = 0; i < totalFiles; i++) {
 
             workspace.openTextDocument(files[i]).then(function (file) {
-                searchAnnotationInFile(file, annotations, annotationList, pattern);
+                searchAnnotationInFile(file, annotations, annotationList, patterns);
                 file_iterated();
             }, function (err) {
                 errorHandler(err);
@@ -114,40 +102,43 @@ function searchAnnotations(workspaceState, pattern, callback) {
             });
 
         }
-        
+
     }, function (err) {
         errorHandler(err);
     });
 }
 
-function searchAnnotationInFile(file, annotations, annotationList, regexp) {
+function searchAnnotationInFile(file, annotations, annotationList, patterns) {
     var fileInUri = file.uri.toString();
     var pathWithoutFile = fileInUri.substring(7, fileInUri.length);
 
     for (var line = 0; line < file.lineCount; line++) {
         var lineText = file.lineAt(line).text;
-        var match = lineText.match(regexp);
-        if (match !== null) {
-            if (!annotations.hasOwnProperty(pathWithoutFile)) {
-                annotations[pathWithoutFile] = [];
-            }
-            var content = getContent(lineText, match);
-            if (content.length > 500) {
-                content = content.substring(0, 500).trim() + '...';
-            }
-            var locationInfo = getLocationInfo(fileInUri, pathWithoutFile, lineText, line, match);
+        for (var i = 0; i < patterns.length; i++) {
+            var regexp = patterns[i];
+            var match = lineText.match(regexp);
+            if (match !== null) {
+                if (!annotations.hasOwnProperty(pathWithoutFile)) {
+                    annotations[pathWithoutFile] = [];
+                }
+                var content = getContent(lineText, match);
+                if (content.length > 500) {
+                    content = content.substring(0, 500).trim() + '...';
+                }
+                var locationInfo = getLocationInfo(fileInUri, pathWithoutFile, lineText, line, match);
 
-            var annotation = {
-                uri: locationInfo.uri,
-                label: content,
-                detail: locationInfo.relativePath,
-                lineNum: line,
-                fileName: locationInfo.absPath,
-                startCol: locationInfo.startCol,
-                endCol: locationInfo.endCol
-            };
-            annotationList.push(annotation);
-            annotations[pathWithoutFile].push(annotation);
+                var annotation = {
+                    uri: locationInfo.uri,
+                    label: content,
+                    detail: locationInfo.relativePath,
+                    lineNum: line,
+                    fileName: locationInfo.absPath,
+                    startCol: locationInfo.startCol,
+                    endCol: locationInfo.endCol
+                };
+                annotationList.push(annotation);
+                annotations[pathWithoutFile].push(annotation);
+            }
         }
     }
 }

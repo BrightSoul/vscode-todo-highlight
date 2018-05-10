@@ -13,7 +13,7 @@ function activate(context) {
 
     var timeout = null;
     var activeEditor = window.activeTextEditor;
-    var isCaseSensitive, assembledData, decorationTypes, pattern, styleForRegExp, keywordsPattern;
+    var isCaseSensitive, assembledData, decorationTypes, patterns, styleForRegExp, keywordsPattern;
     var workspaceState = context.workspaceState;
 
     var settings = workspace.getConfiguration('todohighlight');
@@ -28,17 +28,17 @@ function activate(context) {
 
     context.subscriptions.push(vscode.commands.registerCommand('todohighlight.listAnnotations', function () {
         if (keywordsPattern.trim()) {
-            util.searchAnnotations(workspaceState, pattern, util.annotationsFound);
+            util.searchAnnotations(workspaceState, patterns, util.annotationsFound);
         } else {
             if (!assembledData) return;
             var availableAnnotationTypes = Object.keys(assembledData);
             availableAnnotationTypes.unshift('ALL');
             util.chooseAnnotationType(availableAnnotationTypes).then(function (annotationType) {
                 if (!annotationType) return;
-                var searchPattern = pattern;
+                var searchPatterns = patterns;
                 if (annotationType != 'ALL') {
                     annotationType = util.escapeRegExp(annotationType);
-                    searchPattern = new RegExp(annotationType, isCaseSensitive ? 'g' : 'gi');
+                    searchPattern = patterns.map(p => new RegExp(annotationType, isCaseSensitive ? 'g' : 'gi'));
                 }
                 util.searchAnnotations(workspaceState, searchPattern, util.annotationsFound);
             });
@@ -84,27 +84,33 @@ function activate(context) {
         }
 
         var text = activeEditor.document.getText();
+        var lines = text.split("\n");
         var mathes = {}, match;
-        while (match = pattern.exec(text)) {
-            var startPos = activeEditor.document.positionAt(match.index);
-            var endPos = activeEditor.document.positionAt(match.index + match[0].length);
-            var decoration = {
-                range: new vscode.Range(startPos, endPos)
-            };
+        for (var i = 0; i < patterns.length; i++) {
+            var pattern = patterns[i].text;
+            var regexp = patterns[i].regexp;
+            while (match = regexp.exec(text)) {
+                var startPos = activeEditor.document.positionAt(match.index);
+                var endPos = activeEditor.document.positionAt(match.index + match[0].length);
+                var decoration = {
+                    range: new vscode.Range(startPos, endPos)
+                };
 
-            var matchedValue = match[0];
-            if (!isCaseSensitive) {
-                matchedValue = matchedValue.toUpperCase();
-            }
+                var matchedValue = match[0];
+                if (!isCaseSensitive) {
+                    matchedValue = matchedValue.toUpperCase();
+                }
 
-            if (mathes[matchedValue]) {
-                mathes[matchedValue].push(decoration);
-            } else {
-                mathes[matchedValue] = [decoration];
-            }
+                if (mathes[pattern]) {
+                    mathes[pattern].push(decoration);
+                } else {
+                    mathes[pattern] = [decoration];
+                }
 
-            if (keywordsPattern.trim() && !decorationTypes[matchedValue]) {
-                decorationTypes[matchedValue] = window.createTextEditorDecorationType(styleForRegExp);
+                if (keywordsPattern.trim() && !decorationTypes[pattern]) {
+                    var editorDecoration = window.createTextEditorDecorationType(styleForRegExp);
+                    decorationTypes[pattern] = { block: editorDecoration, inline: editorDecoration };
+                }
             }
         }
 
@@ -114,7 +120,34 @@ function activate(context) {
             }
             var rangeOption = settings.get('isEnable') && mathes[v] ? mathes[v] : [];
             var decorationType = decorationTypes[v];
-            activeEditor.setDecorations(decorationType, rangeOption);
+            if (decorationType.inline == decorationType.block) {
+                activeEditor.setDecorations(decorationType.inline, rangeOption);
+            } else {
+                activeEditor.setDecorations(decorationType.block, rangeOption);
+                    /*for (var i = 0; i < rangeOption.length; i++) {
+                        var range = rangeOption[i].range;
+                        for (var l = range.start.line; l <= range.end.line; l++) {
+                            var style = decorationType.block;
+                            if (l == range.start.line) {
+                                var partialRange = new vscode.Range(new vscode.Position(l, range.start.character), new vscode.Position(l, l == range.end.line ? range.end.character : lines[l].length - 1));
+                                if (range.start.character == 0 && (l < range.end.line || lines[l].replace("\r", "").length <= range.end.character)) {
+                                    activeEditor.setDecorations(decorationType.block, [partialRange]);
+                                } else {
+                                    activeEditor.setDecorations(decorationType.inline, [partialRange]);
+                                }
+                            } else if (l == range.end.line) {
+                                var partialRange = new vscode.Range(new vscode.Position(l, 0), new vscode.Position(l, range.end.character));
+                                activeEditor.setDecorations(decorationType.inline, [partialRange]);
+
+                            } else {
+                                var partialRange = new vscode.Range(new vscode.Position(l, 0), new vscode.Position(l, 1));
+                                activeEditor.setDecorations(decorationType.block, [partialRange]);
+                            }
+
+                        }
+                    }
+                    */
+            }
         })
     }
 
@@ -136,7 +169,7 @@ function activate(context) {
             styleForRegExp = Object.assign({}, util.DEFAULT_STYLE, customDefaultStyle, {
                 overviewRulerLane: vscode.OverviewRulerLane.Right
             });
-            pattern = keywordsPattern;
+            patterns = [keywordsPattern];
         } else {
             assembledData = util.getAssembledData(settings.get('keywords'), customDefaultStyle, isCaseSensitive);
             Object.keys(assembledData).forEach((v) => {
@@ -153,18 +186,19 @@ function activate(context) {
                     mergedStyle.overviewRulerColor = mergedStyle.backgroundColor;
                 }
 
-                decorationTypes[v] = window.createTextEditorDecorationType(mergedStyle);
+                var blockEditorDecoration = window.createTextEditorDecorationType(mergedStyle);
+                var inlineEditorDecoration = blockEditorDecoration;
+                if (mergedStyle.isWholeLine) {
+                    mergedStyle.isWholeLine = false;
+                    inlineEditorDecoration = window.createTextEditorDecorationType(mergedStyle);
+                }
+                decorationTypes[v] = { block: blockEditorDecoration, inline: inlineEditorDecoration };
             });
 
-            pattern = Object.keys(assembledData).map((v) => {
-                return util.escapeRegExp(v);
-            }).join('|');
+            patterns = Object.keys(assembledData).map((v) => v);
         }
 
-        pattern = new RegExp(pattern, 'gi');
-        if (isCaseSensitive) {
-            pattern = new RegExp(pattern, 'g');
-        }
+        patterns = patterns.map(p => { return { text: p, regexp: new RegExp(p, isCaseSensitive ? 'gm' : 'gim') }; });
 
     }
 
